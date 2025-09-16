@@ -1,284 +1,198 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>9m牆 × 50×50cm螢幕 × 人物比例 模擬（反彈修正版）</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Motion Lab — 螢幕橫移模擬器</title>
+<meta name="description" content="在 9m 牆上模擬 50×50cm 螢幕的位移、速度與加速度，可調人物比例與反彈。" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#f5f7fb; --ink:#1f2937; --accent:#2563eb; --card:#ffffff; --wall:#e5e7eb; }
-  body{font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto; background: var(--bg); color: var(--ink); margin:0}
-  .wrap{max-width: 1200px; margin: 24px auto; padding: 0 16px}
-  h2{margin: 0 0 12px}
-  .controls{display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); background: var(--card); padding:16px; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,.06)}
-  .control{display:flex; flex-direction:column; gap:6px}
-  .control label{font-size:.9rem; color:#374151}
-  .control input,.control select{padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px}
-  .actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
-  button{padding:10px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer}
-  .hint{font-size:12px; color:#6b7280}
-  #stageWrap{background: var(--card); border-radius:12px; padding:12px; margin-top:16px; box-shadow: 0 6px 20px rgba(0,0,0,.08)}
-  #container{position:relative; width: min(96vw, 1100px); height: 420px; margin: 10px auto 4px; background: linear-gradient(#fff, #fff) padding-box, repeating-linear-gradient(90deg, var(--wall) 0 2px, transparent 2px 4px) border-box; border:2px solid #e5e7eb; border-radius:10px; overflow:hidden}
-  .ground{position:absolute; left:0; right:0; bottom:0; height:2px; background:#9ca3af}
-  .screen{position:absolute; background:#93c5fd; border:2px solid #3b82f6; border-radius:6px; color:#1f2937; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 18px rgba(59,130,246,.25)}
-  .person{position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none}
-  .head{background:#6b7280; border-radius:999px}
-  .body{background:#6b7280; border-radius:6px}
-  .legend{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; font-size:12px; color:#374151}
-  .chip{display:inline-flex; gap:6px; align-items:center; background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; padding:6px 10px; border-radius:999px}
-  .dot{width:10px; height:10px; border-radius:999px}
+  :root{
+    --bg:#0f172a;          /* slate-900 */
+    --ink:#e5e7eb;         /* gray-200 */
+    --muted:#94a3b8;       /* slate-400 */
+    --card:#0b1224;        /* deep */
+    --panel:#111827;       /* panel */
+    --accent:#60a5fa;      /* blue-400 */
+    --accent-2:#22d3ee;    /* cyan-400 */
+    --ring:rgba(96,165,250,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0; font-family:'Noto Sans TC',ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto; color:var(--ink); background: radial-gradient(1200px 700px at 20% -10%, rgba(56,189,248,.15), transparent 55%), radial-gradient(1000px 600px at 80% -10%, rgba(96,165,250,.18), transparent 50%), var(--bg);}  
+  a{color:inherit; text-decoration:none}
+  .container{max-width:1160px; margin:0 auto; padding:24px}
+
+  /* Navbar */
+  .nav{display:flex; align-items:center; justify-content:space-between; gap:16px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:.5px}
+  .brand .logo{width:36px; height:36px; background:linear-gradient(135deg,var(--accent),var(--accent-2)); border-radius:10px; display:grid; place-items:center; box-shadow:0 8px 30px rgba(34,211,238,.25)}
+  .brand .logo svg{width:22px; height:22px; opacity:.95}
+  .nav a{opacity:.9}
+
+  /* Hero */
+  .hero{display:grid; grid-template-columns:1.1fr .9fr; align-items:center; gap:36px; padding:40px 0}
+  @media (max-width:900px){.hero{grid-template-columns:1fr; padding:28px 0}}
+  .title{font-size:clamp(28px,4vw,46px); line-height:1.12; font-weight:800}
+  .subtitle{color:var(--muted); font-size:clamp(14px,1.4vw,17px); margin-top:12px}
+  .cta{display:flex; gap:12px; margin-top:22px; flex-wrap:wrap}
+  .btn{padding:12px 18px; border-radius:12px; font-weight:700; display:inline-flex; align-items:center; gap:10px; border:1px solid transparent; transition:transform .06s ease, box-shadow .2s ease}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2)); color:#0b1224; box-shadow:0 12px 30px rgba(34,211,238,.25)}
+  .btn.ghost{border-color:#334155; color:var(--ink); background:rgba(255,255,255,.02)}
+  .meta{display:flex; gap:16px; margin-top:12px; color:#9ca3af; font-size:13px}
+
+  /* Preview card */
+  .card{background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02)); border:1px solid #1f2937; border-radius:16px; padding:18px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .screen{aspect-ratio:16/10; width:100%; border-radius:12px; background:
+    linear-gradient(180deg, rgba(96,165,250,.18), rgba(96,165,250,.05)),
+    repeating-linear-gradient(90deg, rgba(148,163,184,.25) 0 2px, transparent 2px 6px),
+    radial-gradient(400px 120px at 20% 30%, rgba(34,211,238,.28), transparent 60%),
+    #0b1224; position:relative; overflow:hidden; border:1px solid #334155}
+  .badge{position:absolute; top:12px; left:12px; font-size:12px; color:#0b1224; background:#67e8f9; padding:4px 10px; border-radius:999px; font-weight:700}
+  .demo{position:absolute; inset:0; display:grid; place-items:center}
+  .demo svg{width:86%; max-width:760px; opacity:.9}
+
+  /* Features */
+  .features{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:26px}
+  @media (max-width:900px){.features{grid-template-columns:1fr}}
+  .feature{background:rgba(255,255,255,.03); border:1px solid #243042; padding:16px; border-radius:12px}
+  .feature h4{margin:0 0 6px; font-size:16px}
+  .feature p{margin:0; color:#9ca3af; font-size:14px}
+
+  /* How-to */
+  .how{margin-top:36px; display:grid; grid-template-columns:1fr 1fr; gap:24px}
+  @media (max-width:900px){.how{grid-template-columns:1fr}}
+  .step{background:rgba(255,255,255,.03); border:1px solid #243042; padding:16px; border-radius:12px}
+  .step h4{margin:0 0 8px}
+  .step ol{margin:0 0 8px 18px}
+  .step li{margin:4px 0}
+
+  footer{margin:28px 0 16px; text-align:center; color:#94a3b8; font-size:12px}
+  .link{color:#7dd3fc; text-decoration:underline dotted; text-underline-offset:2px}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <h2>9m牆 × 50×50cm螢幕 × 人物比例 模擬（反彈修正版）</h2>
+  <header class="container nav">
+    <div class="brand">
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0b1224" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/></svg>
+      </div>
+      <span>Motion Lab</span>
+    </div>
+    <nav>
+      <a class="link" href="#how">使用說明</a>
+    </nav>
+  </header>
 
-    <div class="controls">
-      <div class="control">
-        <label>初始速度（逗號分隔）</label>
-        <input id="speeds" value="1,2,3" placeholder="例如 1,2,3" />
+  <main class="container hero">
+    <section>
+      <h1 class="title">在 9 m 牆上，模擬 50×50 cm 螢幕的實際運動</h1>
+      <p class="subtitle">可輸入 <strong>速度/單位/加速度/時間</strong>，調整<strong>人物身高與位置</strong>作為比例參照，支援<strong>起點方向</strong>與<strong>反彈</strong>。用來預視裝置在空間裡的移動效果。</p>
+      <div class="cta">
+        <a class="btn primary" href="simulator.html">🚀 開啟模擬器</a>
+        <a class="btn ghost" href="#how">📘 快速上手</a>
       </div>
-      <div class="control">
-        <label>速度單位</label>
-        <select id="unit">
-          <option value="cm">cm/s</option>
-          <option value="m">m/s</option>
-        </select>
+      <div class="meta">
+        <span>50×50 cm 螢幕 ‧ 9 m 牆面</span>
+        <span>真實比例 · 反彈修正版</span>
       </div>
-      <div class="control">
-        <label>加速度（同單位/s²，逗號分隔；空白=0）</label>
-        <input id="accelerations" placeholder="例如 0,0.5,-0.2" />
+    </section>
+    <aside class="card">
+      <div class="screen">
+        <span class="badge">即時參數</span>
+        <div class="demo" aria-hidden="true">
+          <!-- 簡單示意 SVG（靜態插畫） -->
+          <svg viewBox="0 0 1200 720" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#67e8f9" stop-opacity=".45"/>
+                <stop offset="1" stop-color="#60a5fa" stop-opacity=".2"/>
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="1200" height="720" fill="url(#g1)"/>
+            <rect x="60" y="600" width="1080" height="6" fill="#9ca3af"/>
+            <rect x="900" y="380" width="110" height="110" rx="10" fill="#60a5fa" stroke="#1e3a8a" stroke-width="6"/>
+            <g transform="translate(560 490)">
+              <circle cx="0" cy="-80" r="20" fill="#94a3b8"/>
+              <rect x="-14" y="-60" width="28" height="80" rx="6" fill="#94a3b8"/>
+            </g>
+            <g fill="#94a3b8" opacity=".4">
+              <rect x="60" y="160" width="3" height="480"/>
+              <rect x="120" y="160" width="3" height="480"/>
+              <rect x="180" y="160" width="3" height="480"/>
+              <rect x="240" y="160" width="3" height="480"/>
+              <rect x="300" y="160" width="3" height="480"/>
+              <rect x="360" y="160" width="3" height="480"/>
+              <rect x="420" y="160" width="3" height="480"/>
+              <rect x="480" y="160" width="3" height="480"/>
+              <rect x="540" y="160" width="3" height="480"/>
+              <rect x="600" y="160" width="3" height="480"/>
+              <rect x="660" y="160" width="3" height="480"/>
+              <rect x="720" y="160" width="3" height="480"/>
+              <rect x="780" y="160" width="3" height="480"/>
+              <rect x="840" y="160" width="3" height="480"/>
+              <rect x="900" y="160" width="3" height="480"/>
+              <rect x="960" y="160" width="3" height="480"/>
+              <rect x="1020" y="160" width="3" height="480"/>
+              <rect x="1080" y="160" width="3" height="480"/>
+            </g>
+          </svg>
+        </div>
       </div>
-      <div class="control">
-        <label>動畫時間（秒）</label>
-        <input id="duration" type="number" value="5" />
-      </div>
-      <div class="control">
-        <label>人物身高（cm）</label>
-        <input id="personH" type="number" value="170" />
-        <div class="hint">人物依真實比例縮放</div>
-      </div>
-      <div class="control">
-        <label>人物位置</label>
-        <select id="personPos">
-          <option value="center">置中</option>
-          <option value="left">靠左</option>
-          <option value="right">靠右</option>
-        </select>
-      </div>
-      <div class="control">
-        <label>螢幕起點</label>
-        <select id="startPos">
-          <option value="right">右側起點（向左移動）</option>
-          <option value="left">左側起點（向右移動）</option>
-        </select>
-      </div>
-      <div class="control">
-        <label>碰壁反彈</label>
-        <select id="bounce">
-          <option value="off">關閉</option>
-          <option value="on">開啟（彈性反彈）</option>
-        </select>
-      </div>
-      <div class="control">
-        <label>牆長（固定）</label>
-        <input value="9 m（900 cm）" disabled />
-      </div>
-      <div class="control">
-        <label>螢幕尺寸（固定）</label>
-        <input value="50 × 50 cm" disabled />
-      </div>
+    </aside>
+  </main>
 
-      <div class="actions">
-        <button id="run">開始動畫</button>
-        <span class="hint">位移：x = v₀ t + ½ a t²；反彈模式採逐幀數值積分與接觸約束（避免卡牆）。</span>
+  <section id="features" class="container">
+    <div class="features">
+      <div class="feature">
+        <h4>真實比例</h4>
+        <p>50×50 cm 螢幕、9 m 牆面，人物身高依輸入數值等比顯示。</p>
+      </div>
+      <div class="feature">
+        <h4>完整運動參數</h4>
+        <p>速度、單位（cm/s 或 m/s）、加速度、動畫時間自由設定。</p>
+      </div>
+      <div class="feature">
+        <h4>空間互動</h4>
+        <p>可選起點方向、是否反彈；支援人物置左/置中/置右。</p>
       </div>
     </div>
+  </section>
 
-    <div id="stageWrap">
-      <div id="container"><div class="ground"></div></div>
-      <div class="legend" id="legend"></div>
+  <section id="how" class="container how">
+    <div class="step">
+      <h4>如何開始</h4>
+      <ol>
+        <li>點擊「開啟模擬器」。</li>
+        <li>輸入初始速度（逗號分隔，如 1,2,3）。</li>
+        <li>選擇單位、加速度與動畫時間。</li>
+        <li>設定人物身高與位置，選擇起點與是否反彈。</li>
+        <li>按下「開始動畫」，即會在牆面上模擬運動。</li>
+      </ol>
+      <p>反彈模式已採用接觸約束，避免高速加速度時卡牆。</p>
     </div>
-  </div>
+    <div class="step">
+      <h4>部署成網址</h4>
+      <ol>
+        <li>將這個首頁存為 <code>index.html</code>；把你的模擬器檔案另存為 <code>simulator.html</code>（或修改上方按鈕連結）。</li>
+        <li>在 GitHub 建立公開 Repo，將兩個檔案上傳。</li>
+        <li>到 Repo 的 <em>Settings → Pages</em>，Source 選 <em>main / root</em> 後儲存。</li>
+        <li>稍待片刻，你會得到像 <code>https://你的帳號.github.io/你的repo</code> 的網址。</li>
+      </ol>
+      <p>他人即可透過首頁連到你的模擬器操作。</p>
+    </div>
+  </section>
+
+  <footer>
+    <p>© <span id="y"></span> Motion Lab · Made for installation planning</p>
+  </footer>
 
 <script>
-let screens = [];
-let speeds = [];
-let accels = [];
-let animationId;
-let durationSec = 5;
-
-const WALL_LEN_CM = 900;   // 9 m 牆
-const SCREEN_SIZE_CM = 50; // 50×50 cm
-const palette = ["#3b82f6","#10b981","#ef4444","#a855f7","#f59e0b","#06b6d4","#84cc16"];
-
-const container = document.getElementById('container');
-const legend = document.getElementById('legend');
-
-function cmToPxScale(){
-  return container.clientWidth / WALL_LEN_CM; // px per cm
-}
-
-function startAnimation(){
-  cancelAnimationFrame(animationId);
-  container.innerHTML = '<div class="ground"></div>';
-  legend.innerHTML = '';
-  screens = []; speeds = []; accels = [];
-
-  durationSec = parseFloat(document.getElementById('duration').value) || 5;
-  const personHcm = Math.max(10, parseFloat(document.getElementById('personH').value) || 170);
-  const personPos = document.getElementById('personPos').value; // left/center/right
-  const startSide = document.getElementById('startPos').value;  // left/right
-  const bounce = document.getElementById('bounce').value === 'on';
-
-  const speedArray = (document.getElementById('speeds').value||'')
-    .split(',').map(s=>parseFloat(s.trim())).filter(v=>!Number.isNaN(v));
-  const accelRaw = document.getElementById('accelerations').value||'';
-  let accelArray = accelRaw ? accelRaw.split(',').map(a=>parseFloat(a.trim())) : [];
-  if(accelArray.some(Number.isNaN)) accelArray = [];
-  while (accelArray.length < speedArray.length) accelArray.push(0);
-
-  const unit = document.getElementById('unit').value;
-  const unitFactor = (unit === 'm') ? 100 : 1; // m/s → cm/s
-
-  const scale = cmToPxScale();
-  const screenSizePx = SCREEN_SIZE_CM * scale;
-
-  // 設定容器高度（不小於人物高度）
-  const rows = Math.max(1, speedArray.length);
-  const rowGapPx = Math.max(12, 0.3 * screenSizePx);
-  const stackHeightPx = rows*screenSizePx + (rows+1)*rowGapPx;
-  const personHeightPx = personHcm * scale;
-  container.style.height = Math.ceil(Math.max(stackHeightPx + 24, personHeightPx + 24)) + 'px';
-
-  // 放人物（水平位置、腳踩地）
-  const person = buildPerson(personHcm, scale);
-  container.appendChild(person.wrapper);
-  let personLeftPx = 0;
-  if (personPos === 'left') personLeftPx = 10;
-  if (personPos === 'center') personLeftPx = (container.clientWidth - person.widthPx)/2;
-  if (personPos === 'right') personLeftPx = container.clientWidth - person.widthPx - 10;
-  person.wrapper.style.left = personLeftPx + 'px';
-  person.wrapper.style.bottom = '0px';
-
-  // 產生螢幕方塊
-  const heightStep = (container.clientHeight - screenSizePx) / Math.max(1, rows-1 || 1);
-  speedArray.forEach((s, i)=>{
-    const scr = document.createElement('div');
-    scr.className = 'screen';
-    scr.style.width = screenSizePx + 'px';
-    scr.style.height = screenSizePx + 'px';
-    scr.style.top = (rows===1 ? (container.clientHeight - screenSizePx)/2 : i*heightStep) + 'px';
-
-    const margin = 10; // 邊距
-    const startLeft = (startSide === 'right')
-      ? (container.clientWidth - screenSizePx - margin)
-      : margin;
-    scr.style.left = startLeft + 'px';
-
-    const color = palette[i % palette.length];
-    scr.style.backgroundColor = color;
-    scr.style.borderColor = color;
-    scr.textContent = `${s}${unit}/s` + (accelArray[i]? ` | a=${accelArray[i]}${unit}/s²` : '');
-    container.appendChild(scr);
-
-    screens.push({
-      el: scr,
-      color,
-      x_cm: (startSide === 'right') ? (WALL_LEN_CM - SCREEN_SIZE_CM) : 0, // 以螢幕左邊緣為位置
-      v_cms: (startSide === 'right') ? -(s*unitFactor) : (s*unitFactor),   // 初始方向
-      a_cms2: (accelArray[i]||0)*unitFactor
-    });
-
-    // 圖例
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.innerHTML = `<span class="dot" style="background:${color}"></span>${s}${unit}/s` + (accelArray[i]? `，a=${accelArray[i]}${unit}/s²` : '');
-    legend.appendChild(chip);
-  });
-
-  // 動畫狀態
-  step._acc = 0;     // 已經過的時間（秒）
-  step._last = null; // 上一幀時間戳
-  step._bounceOn = bounce;
-  animationId = requestAnimationFrame(step);
-}
-
-function buildPerson(heightCm, scale){
-  const wrapper = document.createElement('div');
-  wrapper.className = 'person';
-  const heightPx = heightCm * scale;
-  const headDiaCm = Math.min(25, Math.max(12, heightCm*0.13));
-  const headPx = headDiaCm * scale;
-  const bodyHpx = Math.max(0, heightPx - headPx);
-  const bodyWpx = Math.max(2, Math.min(40*scale, heightPx*0.28));
-  const head = document.createElement('div'); head.className='head'; head.style.width=headPx+'px'; head.style.height=headPx+'px';
-  const body = document.createElement('div'); body.className='body'; body.style.width=bodyWpx+'px'; body.style.height=bodyHpx+'px';
-  wrapper.appendChild(body); wrapper.appendChild(head);
-  wrapper.style.width = Math.max(bodyWpx, headPx) + 'px';
-  wrapper.style.height = heightPx + 'px';
-  wrapper.style.position = 'absolute';
-  return { wrapper, widthPx: Math.max(bodyWpx, headPx), heightPx: heightPx };
-}
-
-function step(ts){
-  const scale = cmToPxScale();
-  const e = 1.0;            // 反彈係數（1=完全彈性；可改 0.8 稍微耗散）
-  const minX = 0;           // 左牆（螢幕左邊緣）
-  const maxX = WALL_LEN_CM - SCREEN_SIZE_CM; // 右牆（螢幕左邊緣最大）
-
-  // 真實幀間隔 dt（避免秒跳），上限 50ms
-  if (step._last == null) step._last = ts;
-  let dt = (ts - step._last) / 1000;
-  if (dt > 0.05) dt = 0.05;
-  step._last = ts;
-
-  // 終止條件：總時長
-  step._acc += dt;
-  if (step._acc >= durationSec){
-    cancelAnimationFrame(animationId);
-    step._acc = 0; step._last = null;
-    return;
-  }
-
-  for (const s of screens){
-    // 1) 先用加速度更新速度
-    s.v_cms += s.a_cms2 * dt;
-
-    // 2) 更新位置
-    s.x_cm += s.v_cms * dt;
-
-    if (step._bounceOn){
-      // 3) 反彈處理（只在速度仍朝牆時反射）
-      if (s.x_cm < minX){
-        s.x_cm = minX;
-        if (s.v_cms < 0) s.v_cms = -s.v_cms * e;
-      } else if (s.x_cm > maxX){
-        s.x_cm = maxX;
-        if (s.v_cms > 0) s.v_cms = -s.v_cms * e;
-      }
-
-      // 4) 接觸約束：貼牆且加速度仍往牆內推 → 禁止向內並做微小偏移，避免黏牆
-      if (s.x_cm === minX && s.a_cms2 < 0 && s.v_cms <= 0){
-        s.v_cms = 0; s.x_cm = minX + 1e-6;
-      }
-      if (s.x_cm === maxX && s.a_cms2 > 0 && s.v_cms >= 0){
-        s.v_cms = 0; s.x_cm = maxX - 1e-6;
-      }
-    } else {
-      // 無反彈：邊界鉗制
-      if (s.x_cm < minX) s.x_cm = minX;
-      if (s.x_cm > maxX) s.x_cm = maxX;
-    }
-
-    // 繪製
-    s.el.style.left = (s.x_cm * scale) + 'px';
-  }
-
-  animationId = requestAnimationFrame(step);
-}
-
-document.getElementById('run').addEventListener('click', startAnimation);
-window.addEventListener('resize', ()=>{ if (screens.length) startAnimation(); });
+  // 年份小工具
+  document.getElementById('y').textContent = new Date().getFullYear();
 </script>
 </body>
 </html>
