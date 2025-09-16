@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>9m牆 × 50×50cm螢幕 × 人物比例 模擬（反彈修正版）</title>
+<style>
+  :root { --bg:#f5f7fb; --ink:#1f2937; --accent:#2563eb; --card:#ffffff; --wall:#e5e7eb; }
+  body{font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto; background: var(--bg); color: var(--ink); margin:0}
+  .wrap{max-width: 1200px; margin: 24px auto; padding: 0 16px}
+  h2{margin: 0 0 12px}
+  .controls{display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); background: var(--card); padding:16px; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,.06)}
+  .control{display:flex; flex-direction:column; gap:6px}
+  .control label{font-size:.9rem; color:#374151}
+  .control input,.control select{padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:14px}
+  .actions{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+  button{padding:10px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer}
+  .hint{font-size:12px; color:#6b7280}
+  #stageWrap{background: var(--card); border-radius:12px; padding:12px; margin-top:16px; box-shadow: 0 6px 20px rgba(0,0,0,.08)}
+  #container{position:relative; width: min(96vw, 1100px); height: 420px; margin: 10px auto 4px; background: linear-gradient(#fff, #fff) padding-box, repeating-linear-gradient(90deg, var(--wall) 0 2px, transparent 2px 4px) border-box; border:2px solid #e5e7eb; border-radius:10px; overflow:hidden}
+  .ground{position:absolute; left:0; right:0; bottom:0; height:2px; background:#9ca3af}
+  .screen{position:absolute; background:#93c5fd; border:2px solid #3b82f6; border-radius:6px; color:#1f2937; font-size:12px; display:flex; align-items:center; justify-content:center; box-shadow: 0 6px 18px rgba(59,130,246,.25)}
+  .person{position:absolute; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; pointer-events:none}
+  .head{background:#6b7280; border-radius:999px}
+  .body{background:#6b7280; border-radius:6px}
+  .legend{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; font-size:12px; color:#374151}
+  .chip{display:inline-flex; gap:6px; align-items:center; background:#eef2ff; border:1px solid #c7d2fe; color:#3730a3; padding:6px 10px; border-radius:999px}
+  .dot{width:10px; height:10px; border-radius:999px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>9m牆 × 50×50cm螢幕 × 人物比例 模擬（反彈修正版）</h2>
+
+    <div class="controls">
+      <div class="control">
+        <label>初始速度（逗號分隔）</label>
+        <input id="speeds" value="1,2,3" placeholder="例如 1,2,3" />
+      </div>
+      <div class="control">
+        <label>速度單位</label>
+        <select id="unit">
+          <option value="cm">cm/s</option>
+          <option value="m">m/s</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>加速度（同單位/s²，逗號分隔；空白=0）</label>
+        <input id="accelerations" placeholder="例如 0,0.5,-0.2" />
+      </div>
+      <div class="control">
+        <label>動畫時間（秒）</label>
+        <input id="duration" type="number" value="5" />
+      </div>
+      <div class="control">
+        <label>人物身高（cm）</label>
+        <input id="personH" type="number" value="170" />
+        <div class="hint">人物依真實比例縮放</div>
+      </div>
+      <div class="control">
+        <label>人物位置</label>
+        <select id="personPos">
+          <option value="center">置中</option>
+          <option value="left">靠左</option>
+          <option value="right">靠右</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>螢幕起點</label>
+        <select id="startPos">
+          <option value="right">右側起點（向左移動）</option>
+          <option value="left">左側起點（向右移動）</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>碰壁反彈</label>
+        <select id="bounce">
+          <option value="off">關閉</option>
+          <option value="on">開啟（彈性反彈）</option>
+        </select>
+      </div>
+      <div class="control">
+        <label>牆長（固定）</label>
+        <input value="9 m（900 cm）" disabled />
+      </div>
+      <div class="control">
+        <label>螢幕尺寸（固定）</label>
+        <input value="50 × 50 cm" disabled />
+      </div>
+
+      <div class="actions">
+        <button id="run">開始動畫</button>
+        <span class="hint">位移：x = v₀ t + ½ a t²；反彈模式採逐幀數值積分與接觸約束（避免卡牆）。</span>
+      </div>
+    </div>
+
+    <div id="stageWrap">
+      <div id="container"><div class="ground"></div></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+<script>
+let screens = [];
+let speeds = [];
+let accels = [];
+let animationId;
+let durationSec = 5;
+
+const WALL_LEN_CM = 900;   // 9 m 牆
+const SCREEN_SIZE_CM = 50; // 50×50 cm
+const palette = ["#3b82f6","#10b981","#ef4444","#a855f7","#f59e0b","#06b6d4","#84cc16"];
+
+const container = document.getElementById('container');
+const legend = document.getElementById('legend');
+
+function cmToPxScale(){
+  return container.clientWidth / WALL_LEN_CM; // px per cm
+}
+
+function startAnimation(){
+  cancelAnimationFrame(animationId);
+  container.innerHTML = '<div class="ground"></div>';
+  legend.innerHTML = '';
+  screens = []; speeds = []; accels = [];
+
+  durationSec = parseFloat(document.getElementById('duration').value) || 5;
+  const personHcm = Math.max(10, parseFloat(document.getElementById('personH').value) || 170);
+  const personPos = document.getElementById('personPos').value; // left/center/right
+  const startSide = document.getElementById('startPos').value;  // left/right
+  const bounce = document.getElementById('bounce').value === 'on';
+
+  const speedArray = (document.getElementById('speeds').value||'')
+    .split(',').map(s=>parseFloat(s.trim())).filter(v=>!Number.isNaN(v));
+  const accelRaw = document.getElementById('accelerations').value||'';
+  let accelArray = accelRaw ? accelRaw.split(',').map(a=>parseFloat(a.trim())) : [];
+  if(accelArray.some(Number.isNaN)) accelArray = [];
+  while (accelArray.length < speedArray.length) accelArray.push(0);
+
+  const unit = document.getElementById('unit').value;
+  const unitFactor = (unit === 'm') ? 100 : 1; // m/s → cm/s
+
+  const scale = cmToPxScale();
+  const screenSizePx = SCREEN_SIZE_CM * scale;
+
+  // 設定容器高度（不小於人物高度）
+  const rows = Math.max(1, speedArray.length);
+  const rowGapPx = Math.max(12, 0.3 * screenSizePx);
+  const stackHeightPx = rows*screenSizePx + (rows+1)*rowGapPx;
+  const personHeightPx = personHcm * scale;
+  container.style.height = Math.ceil(Math.max(stackHeightPx + 24, personHeightPx + 24)) + 'px';
+
+  // 放人物（水平位置、腳踩地）
+  const person = buildPerson(personHcm, scale);
+  container.appendChild(person.wrapper);
+  let personLeftPx = 0;
+  if (personPos === 'left') personLeftPx = 10;
+  if (personPos === 'center') personLeftPx = (container.clientWidth - person.widthPx)/2;
+  if (personPos === 'right') personLeftPx = container.clientWidth - person.widthPx - 10;
+  person.wrapper.style.left = personLeftPx + 'px';
+  person.wrapper.style.bottom = '0px';
+
+  // 產生螢幕方塊
+  const heightStep = (container.clientHeight - screenSizePx) / Math.max(1, rows-1 || 1);
+  speedArray.forEach((s, i)=>{
+    const scr = document.createElement('div');
+    scr.className = 'screen';
+    scr.style.width = screenSizePx + 'px';
+    scr.style.height = screenSizePx + 'px';
+    scr.style.top = (rows===1 ? (container.clientHeight - screenSizePx)/2 : i*heightStep) + 'px';
+
+    const margin = 10; // 邊距
+    const startLeft = (startSide === 'right')
+      ? (container.clientWidth - screenSizePx - margin)
+      : margin;
+    scr.style.left = startLeft + 'px';
+
+    const color = palette[i % palette.length];
+    scr.style.backgroundColor = color;
+    scr.style.borderColor = color;
+    scr.textContent = `${s}${unit}/s` + (accelArray[i]? ` | a=${accelArray[i]}${unit}/s²` : '');
+    container.appendChild(scr);
+
+    screens.push({
+      el: scr,
+      color,
+      x_cm: (startSide === 'right') ? (WALL_LEN_CM - SCREEN_SIZE_CM) : 0, // 以螢幕左邊緣為位置
+      v_cms: (startSide === 'right') ? -(s*unitFactor) : (s*unitFactor),   // 初始方向
+      a_cms2: (accelArray[i]||0)*unitFactor
+    });
+
+    // 圖例
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `<span class="dot" style="background:${color}"></span>${s}${unit}/s` + (accelArray[i]? `，a=${accelArray[i]}${unit}/s²` : '');
+    legend.appendChild(chip);
+  });
+
+  // 動畫狀態
+  step._acc = 0;     // 已經過的時間（秒）
+  step._last = null; // 上一幀時間戳
+  step._bounceOn = bounce;
+  animationId = requestAnimationFrame(step);
+}
+
+function buildPerson(heightCm, scale){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'person';
+  const heightPx = heightCm * scale;
+  const headDiaCm = Math.min(25, Math.max(12, heightCm*0.13));
+  const headPx = headDiaCm * scale;
+  const bodyHpx = Math.max(0, heightPx - headPx);
+  const bodyWpx = Math.max(2, Math.min(40*scale, heightPx*0.28));
+  const head = document.createElement('div'); head.className='head'; head.style.width=headPx+'px'; head.style.height=headPx+'px';
+  const body = document.createElement('div'); body.className='body'; body.style.width=bodyWpx+'px'; body.style.height=bodyHpx+'px';
+  wrapper.appendChild(body); wrapper.appendChild(head);
+  wrapper.style.width = Math.max(bodyWpx, headPx) + 'px';
+  wrapper.style.height = heightPx + 'px';
+  wrapper.style.position = 'absolute';
+  return { wrapper, widthPx: Math.max(bodyWpx, headPx), heightPx: heightPx };
+}
+
+function step(ts){
+  const scale = cmToPxScale();
+  const e = 1.0;            // 反彈係數（1=完全彈性；可改 0.8 稍微耗散）
+  const minX = 0;           // 左牆（螢幕左邊緣）
+  const maxX = WALL_LEN_CM - SCREEN_SIZE_CM; // 右牆（螢幕左邊緣最大）
+
+  // 真實幀間隔 dt（避免秒跳），上限 50ms
+  if (step._last == null) step._last = ts;
+  let dt = (ts - step._last) / 1000;
+  if (dt > 0.05) dt = 0.05;
+  step._last = ts;
+
+  // 終止條件：總時長
+  step._acc += dt;
+  if (step._acc >= durationSec){
+    cancelAnimationFrame(animationId);
+    step._acc = 0; step._last = null;
+    return;
+  }
+
+  for (const s of screens){
+    // 1) 先用加速度更新速度
+    s.v_cms += s.a_cms2 * dt;
+
+    // 2) 更新位置
+    s.x_cm += s.v_cms * dt;
+
+    if (step._bounceOn){
+      // 3) 反彈處理（只在速度仍朝牆時反射）
+      if (s.x_cm < minX){
+        s.x_cm = minX;
+        if (s.v_cms < 0) s.v_cms = -s.v_cms * e;
+      } else if (s.x_cm > maxX){
+        s.x_cm = maxX;
+        if (s.v_cms > 0) s.v_cms = -s.v_cms * e;
+      }
+
+      // 4) 接觸約束：貼牆且加速度仍往牆內推 → 禁止向內並做微小偏移，避免黏牆
+      if (s.x_cm === minX && s.a_cms2 < 0 && s.v_cms <= 0){
+        s.v_cms = 0; s.x_cm = minX + 1e-6;
+      }
+      if (s.x_cm === maxX && s.a_cms2 > 0 && s.v_cms >= 0){
+        s.v_cms = 0; s.x_cm = maxX - 1e-6;
+      }
+    } else {
+      // 無反彈：邊界鉗制
+      if (s.x_cm < minX) s.x_cm = minX;
+      if (s.x_cm > maxX) s.x_cm = maxX;
+    }
+
+    // 繪製
+    s.el.style.left = (s.x_cm * scale) + 'px';
+  }
+
+  animationId = requestAnimationFrame(step);
+}
+
+document.getElementById('run').addEventListener('click', startAnimation);
+window.addEventListener('resize', ()=>{ if (screens.length) startAnimation(); });
+</script>
+</body>
+</html>
